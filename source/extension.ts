@@ -18,7 +18,7 @@ const exec = promisify(execFile);
 let context: vscode.ExtensionContext;
 
 const osxFocus = `
-	tell application "Visual Studio Code"
+	tell application "VSCodium - Insiders"
 		activate
 	end tell`;
 function bringEditorToFront() {
