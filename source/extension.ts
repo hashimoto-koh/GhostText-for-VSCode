@@ -73,6 +73,7 @@ function openConnection(socket: WebSocket, request: IncomingMessage) {
 	}
 
 	let tab: Promise<Tab>;
+	let isFirstMessage = true;
 
 	socket.on('close', async () => {
 		const {document} = await tab;
@@ -88,18 +89,30 @@ function openConnection(socket: WebSocket, request: IncomingMessage) {
 			selections: Array<{start: number; end: number}>;
 		};
 
+		const shouldStripParagraphTags =
+			isFirstMessage && text.startsWith('<p>') && text.endsWith('</p>');
+		isFirstMessage = false;
+
 		tab ??= initView(title, socket);
 		const {document, editor} = await tab;
 
+		const updatedText = shouldStripParagraphTags ? text.slice(3, -4) : text;
+		const updatedSelections = shouldStripParagraphTags
+			? selections.map((selection) => ({
+					start: Math.max(0, Math.min(selection.start - 3, updatedText.length)),
+					end: Math.max(0, Math.min(selection.end - 3, updatedText.length)),
+			  }))
+			: selections;
+
 		// When a message is received, replace the document content with the message
 		const edit = new vscode.WorkspaceEdit();
-		edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), text);
+		edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), updatedText);
 
 		updateFromBrowserInProgress = true;
 		await vscode.workspace.applyEdit(edit);
 		updateFromBrowserInProgress = false;
 
-		editor.selections = selections.map(
+		editor.selections = updatedSelections.map(
 			(selection) =>
 				new vscode.Selection(
 					document.positionAt(selection.start),
